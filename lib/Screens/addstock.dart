@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../Models/stock.dart';
-import '../services/stock_service.dart'; // Import your StockService
+import '../services/stock_service.dart';
 
 class AddStockScreen extends StatefulWidget {
   const AddStockScreen({super.key});
@@ -13,23 +13,23 @@ class _AddStockScreenState extends State<AddStockScreen> {
   final _searchController = TextEditingController();
   List<Stock> _searchResults = [];
   bool _isLoading = false; // To show a loading indicator
-  final StockService _stockService = StockService(); // Initialize your StockService
+  final StockService _stockService = StockService();
 
   void _searchStocks(String query) async {
     if (query.isEmpty) return;
 
     setState(() {
-      _isLoading = true; // Show loading indicator
+      _isLoading = true;
     });
 
     try {
-      print('Fetching data for: $query'); // Debugging
+      print('Fetching data for: $query');
       final stockData = await _stockService.fetchStockData(query);
 
-      // Log the full response for debugging
+
       print('API Response: $stockData');
 
-      // Check if the response contains the expected data
+
       final timeSeries = stockData['Time Series (1min)'];
       if (timeSeries != null && timeSeries.isNotEmpty) {
         final latestData = timeSeries.entries.first.value;
@@ -40,22 +40,22 @@ class _AddStockScreenState extends State<AddStockScreen> {
           _searchResults = [
             Stock(query, currentPrice, percentageChange),
           ];
-          _isLoading = false; // Hide loading indicator
+          _isLoading = false;
         });
 
         print('Stock added: $query, $currentPrice, $percentageChange%'); // Debugging
       } else {
         setState(() {
-          _searchResults = []; // No results found
+          _searchResults = [];
           _isLoading = false;
         });
-        print('No time series data available'); // Debugging
+        print('No time series data available');
       }
     } catch (e) {
       setState(() {
-        _isLoading = false; // Hide loading indicator on error
+        _isLoading = false;
       });
-      // Handle error, e.g., show a snackbar or dialog
+
       print('Error fetching stock data: $e'); // Debugging
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load stock data')));
     }
@@ -93,7 +93,7 @@ class _AddStockScreenState extends State<AddStockScreen> {
             ),
             SizedBox(height: 16),
             _isLoading
-                ? Center(child: CircularProgressIndicator()) // Show loading indicator
+                ? Center(child: CircularProgressIndicator())
                 : Expanded(
               child: ListView.separated(
                 itemCount: _searchResults.length,
