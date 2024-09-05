@@ -1,7 +1,6 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-
 import '../Models/stock.dart';
+import '../services/stock_service.dart'; // Import your StockService
 
 class AddStockScreen extends StatefulWidget {
   const AddStockScreen({super.key});
@@ -12,34 +11,55 @@ class AddStockScreen extends StatefulWidget {
 
 class _AddStockScreenState extends State<AddStockScreen> {
   final _searchController = TextEditingController();
-  List<Stock> _allStocks = [
-    Stock('AAPL', 100.0, 2.5),
-    Stock('GOOG', 550.0, -1.2),
-    Stock('MSFT', 150.0, 3.1),
-    Stock('RVNL', 598.75, -1.42),
-    Stock('GAIL', 237.69, 2.49),
-  ];
   List<Stock> _searchResults = [];
+  bool _isLoading = false; // To show a loading indicator
+  final StockService _stockService = StockService(); // Initialize your StockService
 
-  @override
-  void initState() {
-    super.initState();
-    _searchResults = _allStocks; // Initialize with all stocks
-  }
+  void _searchStocks(String query) async {
+    if (query.isEmpty) return;
 
-  void _searchStocks(String query) {
     setState(() {
-      if (query.isEmpty) {
-        _searchResults = _allStocks;
-      } else {
-        _searchResults = _allStocks
-            .where((stock) =>
-            stock.symbol.toLowerCase().contains(query.toLowerCase()))
-            .toList();
-      }
+      _isLoading = true; // Show loading indicator
     });
-  }
 
+    try {
+      print('Fetching data for: $query'); // Debugging
+      final stockData = await _stockService.fetchStockData(query);
+
+      // Log the full response for debugging
+      print('API Response: $stockData');
+
+      // Check if the response contains the expected data
+      final timeSeries = stockData['Time Series (1min)'];
+      if (timeSeries != null && timeSeries.isNotEmpty) {
+        final latestData = timeSeries.entries.first.value;
+        final double currentPrice = double.parse(latestData['1. open']);
+        final double percentageChange = ((currentPrice - double.parse(latestData['4. close'])) / double.parse(latestData['4. close'])) * 100;
+
+        setState(() {
+          _searchResults = [
+            Stock(query, currentPrice, percentageChange),
+          ];
+          _isLoading = false; // Hide loading indicator
+        });
+
+        print('Stock added: $query, $currentPrice, $percentageChange%'); // Debugging
+      } else {
+        setState(() {
+          _searchResults = []; // No results found
+          _isLoading = false;
+        });
+        print('No time series data available'); // Debugging
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false; // Hide loading indicator on error
+      });
+      // Handle error, e.g., show a snackbar or dialog
+      print('Error fetching stock data: $e'); // Debugging
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load stock data')));
+    }
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -63,21 +83,32 @@ class _AddStockScreenState extends State<AddStockScreen> {
                   onPressed: () => _searchStocks(_searchController.text),
                 ),
               ),
-              onChanged: _searchStocks, // Update results as user types
+              onChanged: (query) {
+                if (query.isEmpty) {
+                  setState(() {
+                    _searchResults = [];
+                  });
+                }
+              },
             ),
             SizedBox(height: 16),
-            Expanded(
+            _isLoading
+                ? Center(child: CircularProgressIndicator()) // Show loading indicator
+                : Expanded(
               child: ListView.separated(
                 itemCount: _searchResults.length,
                 separatorBuilder: (context, index) => Divider(color: Colors.grey[300]),
                 itemBuilder: (context, index) {
                   final stock = _searchResults[index];
+                  print(stock.symbol);
                   return ListTile(
                     contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 3.0),
                     title: Text(stock.symbol, style: TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text(
-                      '${stock.currentPrice} (${stock.percentageChange}%)',
-                      style: TextStyle(color: Colors.red),
+                      '${stock.currentPrice} (${stock.percentageChange.toStringAsFixed(2)}%)',
+                      style: TextStyle(
+                        color: stock.percentageChange >= 0 ? Colors.green : Colors.red,
+                      ),
                     ),
                     trailing: IconButton(
                       icon: Icon(Icons.add, color: Colors.green),
